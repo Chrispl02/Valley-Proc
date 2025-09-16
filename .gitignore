@@ -103,3 +103,6 @@ ENV/
 
 #vscode settings
 schainpy/.vscode/
+
+#other
+*.png

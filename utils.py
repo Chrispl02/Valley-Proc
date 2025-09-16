@@ -69,7 +69,8 @@ def set_bki(year, month, day, hour, minute, second, heightList):
     bki=numpy.zeros(MAXNRANGENDT,dtype='float32')
     bki = numpy.array(bki, order='F')
 
-    from schainpy.model.proc import mkfact_short_2020_2
+    #from schainpy.model.proc import mkfact_short_2020_2
+    import mkfact_short_2020_2
     mkfact_short_2020_2.mkfact(year, h, bfm, thb, bki, MAXNRANGENDT)
     return bki
     
@@ -153,3 +154,94 @@ def read_hf_file(path):
     timeZone = numpy.array(timeZone)
 
     return spc, cspc, heightList, utctime, timeZone
+
+
+
+### get noise utils
+
+def hildebrand_sekhon(data, navg):
+    """
+    This method is for the objective determination of the noise level in Doppler spectra. This
+    implementation technique is based on the fact that the standard deviation of the spectral
+    densities is equal to the mean spectral density for white Gaussian noise
+
+    Inputs:
+        Data    :    heights
+        navg    :    numbers of averages
+
+    Return:
+        mean    :    noise's level
+    """
+
+    sortdata = numpy.sort(data, axis=None)
+    #print(numpy.shape(data))
+    #exit()
+    
+    lenOfData = len(sortdata)
+    nums_min = lenOfData*0.2
+
+    if nums_min <= 5:
+
+        nums_min = 5
+
+    sump = 0.
+    sumq = 0.
+
+    j = 0
+    cont = 1
+
+    while((cont == 1)and(j < lenOfData)):
+
+        sump += sortdata[j]
+        sumq += sortdata[j]**2
+
+        if j > nums_min:
+            rtest = float(j)/(j-1) + 1.0/navg
+            if ((sumq*j) > (rtest*sump**2)):
+                j = j - 1
+                sump = sump - sortdata[j]
+                sumq = sumq - sortdata[j]**2
+                cont = 0
+
+        j += 1
+
+    lnoise = sump / j
+    
+    return lnoise
+
+
+def getNoisebyHildebrand(data_spc, xmin_index=None, xmax_index=None, ymin_index=None, ymax_index=None):
+    """
+    Determino el nivel de ruido usando el metodo Hildebrand-Sekhon
+
+    Return:
+        noiselevel
+    """
+    nChannels = 2
+    noise = numpy.zeros(nChannels)
+
+    for channel in range(nChannels):
+        #print(self.data_spc[0])
+        #exit(1)
+        daux = data_spc[channel,xmin_index:xmax_index, ymin_index:ymax_index]
+        #print("daux",daux)
+        noise[channel] = hildebrand_sekhon(daux, 1) # nIncohInt
+
+    return noise
+
+def getNoise(data_spc, xmin_index=None, xmax_index=None, ymin_index=None, ymax_index=None):
+        noise = getNoisebyHildebrand(data_spc, xmin_index, xmax_index, ymin_index, ymax_index)
+        return noise
+
+def getPower(data_spc, normFactor):
+    z = (data_spc.astype(numpy.float32, copy=False) / normFactor)
+    z[~numpy.isfinite(z)] = numpy.nan
+    avg = numpy.nanmean(z, axis=1)
+    return 10 * numpy.log10(avg, where=(avg>0), out=numpy.full_like(avg, numpy.nan))
+
+def getVelRange(Vmax, nFFTPoints, ippFactor, extrapoints=0):
+
+    deltav = Vmax / (nFFTPoints * ippFactor)
+    velrange = deltav * (numpy.arange(nFFTPoints + extrapoints) - nFFTPoints / 2.)
+
+    return velrange
