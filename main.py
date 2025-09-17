@@ -77,94 +77,12 @@ for file in files[:]: #files[3:4]
 
 spc = spc_aux
 cspc = cspc_aux
-
-
 # Spectra arranged in the order of: Channel, DataTime, FFTPoint, Heigh 
-
-
-
-#--- Integragion ---
-'''
-# -- In Time
-n_t = 1#n_t = 18 #n_t = 15
-j = 0
-data_spc_time = []; data_cspc_time = []
-buffer = []; buffer_cspc = []
-buffer = numpy.array(buffer) 
-buffer_cspc = numpy.array(buffer_cspc)
-
-while j < numpy.shape(spc)[1]:
-    buffer = spc[:,j:j+n_t,:,:]
-    buffer_cspc = cspc[:, j:j + n_t,:,:]
-    j += n_t
-    data_spc_time.append(numpy.nansum(buffer,axis=1))
-    data_cspc_time.append(numpy.nansum(buffer_cspc, axis=1))
-
-data_spc_time = numpy.array(data_spc_time)
-data_cspc_time = numpy.array(data_cspc_time)
-# Time correction
-buffer = []
-for i in range(int(-(-len(utctime)//n_t))):
-    buffer.append(utctime[int(i*n_t)])
-utctime = numpy.array(buffer)
-
-# -- In Heigh
-n_h = 1
-j = 0
-data_spc = []; data_cspc = []
-buffer = [];   buffer_cspc = []
-buffer = numpy.array(buffer) 
-buffer_cspc = numpy.array(buffer_cspc)
-
-#while j < numpy.shape(data_spc_time)[3]:
-#    buffer = data_spc_time[:,:,:,j:j+n_h]
-#    buffer_cspc = data_cspc_time[:,:,:,j:j + n_h]
-#    j += n_h
-#    data_spc.append(numpy.nanmean(buffer,axis=3))
-#    data_cspc.append(numpy.nanmean(buffer_cspc, axis=3))
-
-window = n_h
-shape = numpy.shape(data_spc_time)
-shape = numpy.array(shape)
-deltaHeight = heightList[1] - heightList[0]
-newdelta = deltaHeight * window
-r = shape[3]  % window
-newheights = (shape[3] -r)/window
-
-
-buffer = data_spc_time[:, :,:, 0:int(shape[3] -r)]
-buffer = buffer.reshape(shape[0], shape[1,],shape[2],int(shape[3] /window), window)
-buffer = numpy.sum(buffer, 4)
-data_spc = buffer
-del buffer
-
-shape = numpy.shape(data_cspc_time)
-shape = numpy.array(shape)
-buffer = data_cspc_time[:, :,:, 0:int(shape[3] -r)]
-buffer = buffer.reshape(shape[0], shape[1,],shape[2],int(shape[3] /window), window)
-buffer = numpy.sum(buffer, 4)
-data_cspc = buffer
-
-heightList = heightList[0] + numpy.arange( newheights )*newdelta
-
-
-
-# Heigh correction
-#buffer = []
-#for i in range(int(-(-len(heightList)//n_h))):
-#    buffer.append(heightList[int(i*n_h)])
-#heightList = numpy.array(buffer)
-'''
 
 #-- Manage data
 data_spc = numpy.array(spc)
 data_cspc = numpy.array(cspc)
 
-# Reordering due to integration method
-##data_spc = data_spc.transpose(2,1,3,0)
-##data_cspc = data_cspc.transpose(2,1,3,0)
-#data_spc = data_spc.transpose(1,0,2,3)
-#data_cspc = data_cspc.transpose(1,0,2,3)
 print(data_spc.shape)
 print(data_cspc.shape)
 spc = data_spc
@@ -218,13 +136,15 @@ xrange = getVelRange(Vmax, nFFTPoints, ippFactor, 0) # numpy.arange(0, spc.shape
     plt.savefig(f'frame_{i}.png')
     plt.show()'''
 
-
-_power = numpy.array( [getPower(spc[0], normFactor) , getPower(spc[1], normFactor)]  )[:]
+# Heights 72 km to 396 km w/ 3km space
+print("alert")
+_power = numpy.array( [getPower(spc[0], normFactor) , getPower(spc[1], normFactor)]  )#[:]
 _noise = numpy.array([
-    10 * numpy.log10(getNoise(spc[:, i, :, :], ymin_index=55) / normFactor)
+    10 * numpy.log10(getNoise(spc[:, i, :, :], ymin_index=55, ymax_index=75) / normFactor)
     for i in range(len(utctime))
 ]).T
 
+print("alert")
 ### 
 cspc_ch0 = cspc[0] #'First Pair'
 print("cspc_ch0.shape", cspc_ch0.shape)
@@ -236,8 +156,8 @@ h_id_min = 0 #200
 h_id_max = heightList.shape[0]
 
 #--- Remove low coherence mode ---
-LOW_COH_LIM = 4e-3 #1.8e-3 #4e-3
-HIGH_SNR_LIM = 2e-3
+LOW_COH_LIM = 4.5e-3 #1.8e-3 #4e-3
+HIGH_SNR_LIM = 1.8e-3 #2
 RATE = 1.8978873*1e-6
 DH = heightList[1]-heightList[0]
 
@@ -325,6 +245,7 @@ if 0:
 
 
 utctime_all = utctime[:]
+xlim = len(utctime)
 
 #--- Set bki parameter for day ---
 
@@ -335,8 +256,39 @@ hour = 0; minute = 0; second = 0
 
 bki = set_bki(year, month, day, hour, minute, second, heightList)
 #print("Bki: ", bki)
-xlim = len(utctime)
 
+#--- Creation of Cleaning Masks ---
+""" Cleaning by Coherence filtering LOW_COH_LIM and by 
+snr tresshold HIGH_SNR_LIM (optional, only for coherent echoes in ISR)"""
+
+snr_thr = True
+
+coh_all_aux = signal.medfilt2d(coh_all,kernel_size=9) #coh_all.copy()
+coh_all_aux = signal.medfilt2d(coh_all_aux,kernel_size=7) 
+coh_all_aux = numpy.where(coh_all_aux < LOW_COH_LIM ,numpy.nan,coh_all_aux) # .0025
+coh_all_aux_filled = numpy.copy(coh_all_aux[:xlim].T)
+
+snr_all = (_power[0, :xlim, :] - _noise[0, :xlim][:, numpy.newaxis])/_noise[0, :xlim][:, numpy.newaxis]
+snr_all_aux = signal.medfilt2d(snr_all,kernel_size=5)
+snr_all_aux = numpy.where(snr_all_aux > HIGH_SNR_LIM ,numpy.nan,snr_all_aux)
+snr_all_aux_filled = numpy.copy(snr_all_aux[:xlim].T)
+
+
+for t_id in range(coh_all_aux_filled.shape[1]):
+    for h_id in range(1,coh_all_aux_filled.shape[0]-1):
+
+        if numpy.isnan(coh_all_aux_filled[h_id,t_id]) and ~numpy.isnan(coh_all_aux_filled[h_id-1,t_id]) and ~numpy.isnan(coh_all_aux_filled[h_id+1,t_id]):
+            coh_all_aux_filled[h_id,t_id] = (coh_all_aux_filled[h_id-1,t_id]+coh_all_aux_filled[h_id+1,t_id])/2
+
+        if snr_thr and numpy.isnan(snr_all_aux_filled[h_id,t_id]) and ~numpy.isnan(snr_all_aux_filled[h_id-1,t_id]) and ~numpy.isnan(snr_all_aux_filled[h_id+1,t_id]):
+            snr_all_aux_filled[h_id,t_id] = (snr_all_aux_filled[h_id-1,t_id]+snr_all_aux_filled[h_id+1,t_id])/2
+
+# Manual Cleaning
+if year == 2025 and month == 8 and day == 13: 
+    print("Manual cleaning")
+    print()
+    snr_all_aux_filled[70:74,126:135] = numpy.nan; snr_all_aux_filled[69:74,129:135] = numpy.nan
+    snr_all_aux_filled[70:72,148:160] = numpy.nan ; snr_all_aux_filled[71:74,152:161] = numpy.nan
 
 #--- SpectraDatatoFaraday
 
@@ -359,36 +311,30 @@ for i in range(len(utctime)):
 
 power2 = pa_2 + pb_2 #- pas_2 - pbs_2 # - noises
 # dataOut.tnoise = dataOut.noise_lag/float(dataOut.nProfiles*dataOut.nIncohInt)
+
 ###########################
 #--- Valley Processing ---#
 ###########################
-discont = numpy.pi*1
+def fill_nan_linear(arr):
+    a = arr.copy()
+    n = numpy.isnan(a)
+    if n.all():
+        return a
+    x = numpy.arange(len(a))
+    a[n] = numpy.interp(x[n], x[~n], a[~n])
+    return a
+
 from scipy.ndimage import gaussian_filter1d
 
+discont = numpy.pi*1
 dphi = numpy.ones((phase_all.shape[0],phase_all.shape[1]))*numpy.nan
 den = numpy.ones((phase_all.shape[0],phase_all.shape[1]))*numpy.nan
 phase_spline = numpy.ones((phase_all.shape[0],phase_all.shape[1]))*numpy.nan
-
-#for idx in [55,60,65,68,70,80,85,90,95,100,105]:
-'''for idx in [200,220,221,222]:
-    plt.figure(figsize=(5,6))
-    test = phase_all[idx,:]
-    phase_t_un = numpy.unwrap(test, discont=discont)  #unwrap_with_nan(test)
-    tck_s = interpolate.splrep(heightList, phase_t_un, s=2*360, k=4) ##
-    phase_spline_un = interpolate.splev(heightList, tck_s) ##
-    plt.plot(test,heightList,'b')
-    plt.plot(phase_t_un,heightList,'g')
-    phase_t_un_smooth = gaussian_filter1d(phase_t_un,sigma = 10)
-    plt.plot(phase_t_un_smooth ,heightList,'y') # yellow -> used , trasnlated to loop since indexes
-    plt.plot(phase_spline_un ,heightList,'m') # magenta
-    plt.axvline(numpy.pi, color='k', linestyle='--', label='+π')
-    plt.axvline(-numpy.pi, color='k', linestyle='--', label='-π')
-    plt.title('{0} {1}'.format(time.ctime(utctime_all[idx]), idx))'''
-#
-plt.show()
+###
 den_power = numpy.copy(power)
 den_power2 = numpy.copy(power2)
 id_h_lower, id_h_upper = None, None
+
 for idx, phase_t_aux in enumerate(phase_all):
     phase_t = numpy.copy(phase_t_aux)
 
@@ -401,7 +347,7 @@ for idx, phase_t_aux in enumerate(phase_all):
         phase_spline[idx,id_h_lower:id_h_upper] = None
         continue
     
-    else:
+    else: # ver si comentar
         try:
             false_indices = numpy.where(arr == False)[0]
             id_h_lower, id_h_upper = false_indices[0],false_indices[-1]
@@ -434,14 +380,38 @@ for idx, phase_t_aux in enumerate(phase_all):
     phase_spline[idx,:id_h_lower] = None
     #phase_spline[idx,id_h_upper:] = None
 
-    phase_spline[idx,id_h_lower:id_h_upper] = gaussian_filter1d(numpy.unwrap(phase_t[id_h_lower:id_h_upper], discont = discont), sigma=5) ## 15
+    phase_spline[idx,id_h_lower:id_h_upper] = gaussian_filter1d(numpy.unwrap(phase_t[id_h_lower:id_h_upper], discont = discont), sigma=8,
+                                                mode='nearest') ## 15
 
     
     #tck_s = interpolate.splrep(heightList[id_h_lower:id_h_upper], numpy.unwrap(phase_t[id_h_lower:id_h_upper]), s=2*360, k=4) ##
     #phase_spline[idx,id_h_lower:id_h_upper] = interpolate.splev(heightList[id_h_lower:id_h_upper], tck_s)
 
     #spline = csaps.CubicSmoothingSpline(heightList[id_h_lower:id_h_upper], phase_t[id_h_lower:id_h_upper], smooth=0.8)
+    
+    aux = numpy.where(numpy.isnan(snr_all_aux_filled[id_h_lower:id_h_upper,idx]))[0]
+    if snr_thr and len(aux) > 0:
+        
+        global_aux = aux + id_h_lower
+        mask_valid = ~ numpy.isnan(snr_all_aux_filled[id_h_lower:id_h_upper,idx])
+        phase_t_aux[global_aux] = numpy.nan
+        
+        # trabajamos solo en el segmento [id_h_lower:id_h_upper)
+        seg_slice = slice(id_h_lower, id_h_upper)
+        seg = phase_t_aux[seg_slice].copy()
+        mask_valid = ~numpy.isnan(seg)
 
+        if mask_valid.sum() < 5: pass # to fix
+        # rellenar NaN para poder unwrap; luego unwrap y smooth
+        seg_filled = fill_nan_linear(seg)
+        seg_unwrapped = numpy.unwrap(seg_filled, discont=discont)
+        seg_smooth = gaussian_filter1d(seg_unwrapped, sigma=8, mode='nearest')
+        # guardar spline suavizado, pero volver a marcar como NaN donde eran inválidos
+        phase_spline[idx, seg_slice] = seg_smooth
+        #phase_spline[idx, seg_slice][~mask_valid] = numpy.nan
+        
+        #except: phase_t[id_h_lower + aux[0]: id_h_lower + aux[-1]+1] = [numpy.nan if aux for i in range(phase_t[id_h_lower + aux[0]: id_h_lower + aux[-1]+1])]
+        #phase_spline[idx,id_h_lower:id_h_upper] = gaussian_filter1d(numpy.unwrap(phase_t[id_h_lower:id_h_upper], discont = discont), sigma=5)
     
 
 
@@ -449,18 +419,19 @@ for idx, phase_t_aux in enumerate(phase_all):
     #dphi[idx] = interpolate.splev(heightList, tck_s, der=1)
 
     #if idx in [200,220,221,222]:
-    if  idx > 200 and idx < 250 or idx == 133 or idx == 120:
+    #if  idx > 200 and idx < 250 or idx == 133 or (idx in [129,130,131,132,133,134,135]):
+    if  idx > 110 and idx < 170:
         plt.figure(figsize=(5,6))
-        test = phase_t
-        phase_t_un = numpy.unwrap(test, discont=discont)  #unwrap_with_nan(test)
+        test = phase_t_aux
+        phase_t_un = numpy.unwrap(phase_t, discont=discont)  #unwrap_with_nan(test)
         plt.plot(test,heightList,'b')
         plt.plot(phase_t_un,heightList,'g')
         plt.plot(phase_spline[idx] ,heightList,'y') # yellow -> used , trasnlated to loop since indexes
 
         plt.axvline(numpy.pi, color='k', linestyle='--', label='+π')
         plt.axvline(-numpy.pi, color='k', linestyle='--', label='-π')
-        plt.axhline(heightList[mask[0]], color='gray', linestyle='--')
-        plt.axhline(heightList[mask[-1]], color='gray', linestyle='--')
+        plt.axhline(heightList[id_h_lower], color='gray', linestyle='--')
+        plt.axhline(heightList[id_h_upper], color='gray', linestyle='--')
         plt.title('{0} {1}'.format(time.ctime(utctime_all[idx]), idx))
         plt.savefig(f'{idx}_interpol.png')
         plt.close()
@@ -474,31 +445,21 @@ for idx, phase_t_aux in enumerate(phase_all):
         dphi[idx,i]=((phase_spline[idx][i+1]-phase_spline[idx][i-1])+(2.0*(phase_spline[idx][i+2]-phase_spline[idx][i-2])))/10.0 #Better results
 
         den[idx,i]=dphi[idx,i]*abs(fact) 
+
+        if snr_thr and len(aux) > 0:
+            #bad_dphi = numpy.any(numpy.isin(i, global_aux + 1)) or numpy.any(numpy.isin(i, global_aux - 1))
+            bad_dphi = numpy.any(numpy.abs(global_aux - i) <= 2)
+            if bad_dphi: 
+                den[idx,i] = None
+                dphi[idx, i] = None
+                phase_spline[idx,i] = None
+
+
         #'''
 
-### Cleaning Masks
-""" Cleaning by Coherence filtering LOW_COH_LIM and by 
-snr tresshold HIGH_SNR_LIM (optional, only for coherent echoes in ISR)"""
-snr_thr = True
 
-coh_all_aux = signal.medfilt2d(coh_all,kernel_size=9) #coh_all.copy()
-coh_all_aux = signal.medfilt2d(coh_all_aux,kernel_size=7) 
-coh_all_aux = numpy.where(coh_all_aux < LOW_COH_LIM ,numpy.nan,coh_all_aux) # .0025
-coh_all_aux_filled = numpy.copy(coh_all_aux[:xlim].T)
 
-snr_all = (_power[0, :xlim, :] - _noise[0, :xlim][:, numpy.newaxis])/_noise[0, :xlim][:, numpy.newaxis]
-snr_all_aux = signal.medfilt2d(snr_all,kernel_size=9)
-snr_all_aux = numpy.where(snr_all_aux > HIGH_SNR_LIM ,numpy.nan,snr_all_aux)
-snr_all_aux_filled = numpy.copy(snr_all_aux[:xlim].T)
-
-for t_id in range(coh_all_aux_filled.shape[1]):
-    for h_id in range(1,coh_all_aux_filled.shape[0]-1):
-
-        if numpy.isnan(coh_all_aux_filled[h_id,t_id]) and ~numpy.isnan(coh_all_aux_filled[h_id-1,t_id]) and ~numpy.isnan(coh_all_aux_filled[h_id+1,t_id]):
-            coh_all_aux_filled[h_id,t_id] = (coh_all_aux_filled[h_id-1,t_id]+coh_all_aux_filled[h_id+1,t_id])/2
-
-        if numpy.isnan(snr_all_aux_filled[h_id,t_id]) and ~numpy.isnan(snr_all_aux_filled[h_id-1,t_id]) and ~numpy.isnan(snr_all_aux_filled[h_id+1,t_id]):
-            snr_all_aux_filled[h_id,t_id] = (snr_all_aux_filled[h_id-1,t_id]+snr_all_aux_filled[h_id+1,t_id])/2
+### Aplication of cleaning masks
 
 mask = numpy.isnan(coh_all_aux_filled.T)
 #mask[50:54,200:350] = True # Oct 1
@@ -512,7 +473,8 @@ mask_snr = numpy.isnan(snr_all_aux_filled.T)
 
 den = numpy.where(mask ,numpy.nan,den)
 den = numpy.where(mask_snr ,numpy.nan,den)
-den[den < 0] = numpy.nan
+den[den < 1e+4] = numpy.nan
+den[den > 1.5e+6] = numpy.nan
 dphi = numpy.where(mask,numpy.nan,dphi)
 phase_spline = numpy.where(mask ,numpy.nan,phase_spline)
 
@@ -703,7 +665,7 @@ ax = fig.add_subplot(111)
 df_x = pd.DataFrame(data=utctime_all[:], columns=["Dates"])
 df_x['Dates'] = pd.to_datetime(df_x['Dates'], unit='s', errors='coerce')
 
-RTI = ax.pcolormesh(df_x['Dates'][:xlim],heightList,dphi[:xlim].T,cmap='plasma',vmin=-0.04,vmax=.05)
+RTI = ax.pcolormesh(df_x['Dates'][:xlim],heightList,dphi[:xlim].T,cmap='plasma',vmin=-0.04,vmax=.1) # .07
 #RTI = ax.pcolormesh(df_x['Dates'][:xlim],heightList,signal.medfilt2d(dphi[:xlim].T),cmap='Blues',vmin=0,vmax=.04)
 
 date_format = mdates.DateFormatter('%H:%M')
