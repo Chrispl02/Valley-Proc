@@ -286,8 +286,8 @@ if 0:
     
 ccf = signal.medfilt2d(ccf.real,kernel_size=5) + 1j * signal.medfilt2d(ccf.imag,kernel_size=5)
 
-powa = numpy.mean(spc[0]/normFactor,axis=-2)
-powb = numpy.mean(spc[1]/normFactor,axis=-2)
+powa = numpy.mean(spc[0],axis=-2)
+powb = numpy.mean(spc[1],axis=-2)
 avgcoherenceComplex = ccf / numpy.sqrt(powa * powb)
 
 #phase_all = numpy.arctan2(avgcoherenceComplex.imag,avgcoherenceComplex.real)
@@ -335,19 +335,7 @@ hour = 0; minute = 0; second = 0
 
 bki = set_bki(year, month, day, hour, minute, second, heightList)
 #print("Bki: ", bki)
-
-#--- Coherence Data
 xlim = len(utctime)
-coh_all_aux = signal.medfilt2d(coh_all,kernel_size=9) #coh_all.copy()
-coh_all_aux = signal.medfilt2d(coh_all_aux,kernel_size=7) 
-coh_all_aux = numpy.where(coh_all_aux<LOW_COH_LIM ,numpy.nan,coh_all_aux) # .0025
-coh_all_aux_filled = numpy.copy(coh_all_aux[:xlim].T)
-
-for t_id in range(coh_all_aux_filled.shape[1]):
-    for h_id in range(1,coh_all_aux_filled.shape[0]-1):
-        if numpy.isnan(coh_all_aux_filled[h_id,t_id]) and ~numpy.isnan(coh_all_aux_filled[h_id-1,t_id]) and ~numpy.isnan(coh_all_aux_filled[h_id+1,t_id]):
-            coh_all_aux_filled[h_id,t_id] = (coh_all_aux_filled[h_id-1,t_id]+coh_all_aux_filled[h_id+1,t_id])/2
-
 
 
 #--- SpectraDatatoFaraday
@@ -427,7 +415,7 @@ for idx, phase_t_aux in enumerate(phase_all):
         id_h_lower, id_h_upper = longest_false_seq
     id_h_upper,id_h_lower = heightList.shape[0],0'''
     
-    if heightList[id_h_lower] < 100: id_h_lower = numpy.abs(heightList - 100).argmin()
+    #if heightList[id_h_lower] < 100: id_h_lower = numpy.abs(heightList - 100).argmin()
     
     #Always smoothing after the unwrapping 
     ## High-Order interpolation
@@ -435,7 +423,7 @@ for idx, phase_t_aux in enumerate(phase_all):
     #phase_spline[idx,id_h_lower:id_h_upper] = interpolate.splev(heightList[id_h_lower:id_h_upper], tck_s)
     
     # Gaussian Filter
-    phase_spline[idx,id_h_lower:id_h_upper] = gaussian_filter1d(numpy.unwrap(phase_t[id_h_lower:id_h_upper], discont = discont), sigma=15) ## 15
+    phase_spline[idx,id_h_lower:id_h_upper] = gaussian_filter1d(numpy.unwrap(phase_t[id_h_lower:id_h_upper], discont = discont), sigma=5) ## 15
     dev = numpy.gradient(phase_spline[idx])
     mask = numpy.where(numpy.array(dev) > 0)[0]
     print(len(mask))
@@ -446,7 +434,7 @@ for idx, phase_t_aux in enumerate(phase_all):
     phase_spline[idx,:id_h_lower] = None
     #phase_spline[idx,id_h_upper:] = None
 
-    phase_spline[idx,id_h_lower:id_h_upper] = gaussian_filter1d(numpy.unwrap(phase_t[id_h_lower:id_h_upper], discont = discont), sigma=15) ## 15
+    phase_spline[idx,id_h_lower:id_h_upper] = gaussian_filter1d(numpy.unwrap(phase_t[id_h_lower:id_h_upper], discont = discont), sigma=5) ## 15
 
     
     #tck_s = interpolate.splrep(heightList[id_h_lower:id_h_upper], numpy.unwrap(phase_t[id_h_lower:id_h_upper]), s=2*360, k=4) ##
@@ -461,7 +449,7 @@ for idx, phase_t_aux in enumerate(phase_all):
     #dphi[idx] = interpolate.splev(heightList, tck_s, der=1)
 
     #if idx in [200,220,221,222]:
-    if  False: #idx > 200 or idx == 133 or idx == 120:
+    if  idx > 200 and idx < 250 or idx == 133 or idx == 120:
         plt.figure(figsize=(5,6))
         test = phase_t
         phase_t_un = numpy.unwrap(test, discont=discont)  #unwrap_with_nan(test)
@@ -487,15 +475,40 @@ for idx, phase_t_aux in enumerate(phase_all):
 
         den[idx,i]=dphi[idx,i]*abs(fact) 
         #'''
-# Cleaning
+
+### Cleaning Masks
+""" Cleaning by Coherence filtering LOW_COH_LIM and by 
+snr tresshold HIGH_SNR_LIM (optional, only for coherent echoes in ISR)"""
+snr_thr = True
+
+coh_all_aux = signal.medfilt2d(coh_all,kernel_size=9) #coh_all.copy()
+coh_all_aux = signal.medfilt2d(coh_all_aux,kernel_size=7) 
+coh_all_aux = numpy.where(coh_all_aux < LOW_COH_LIM ,numpy.nan,coh_all_aux) # .0025
+coh_all_aux_filled = numpy.copy(coh_all_aux[:xlim].T)
+
+snr_all = (_power[0, :xlim, :] - _noise[0, :xlim][:, numpy.newaxis])/_noise[0, :xlim][:, numpy.newaxis]
+snr_all_aux = signal.medfilt2d(snr_all,kernel_size=9)
+snr_all_aux = numpy.where(snr_all_aux > HIGH_SNR_LIM ,numpy.nan,snr_all_aux)
+snr_all_aux_filled = numpy.copy(snr_all_aux[:xlim].T)
+
+for t_id in range(coh_all_aux_filled.shape[1]):
+    for h_id in range(1,coh_all_aux_filled.shape[0]-1):
+
+        if numpy.isnan(coh_all_aux_filled[h_id,t_id]) and ~numpy.isnan(coh_all_aux_filled[h_id-1,t_id]) and ~numpy.isnan(coh_all_aux_filled[h_id+1,t_id]):
+            coh_all_aux_filled[h_id,t_id] = (coh_all_aux_filled[h_id-1,t_id]+coh_all_aux_filled[h_id+1,t_id])/2
+
+        if numpy.isnan(snr_all_aux_filled[h_id,t_id]) and ~numpy.isnan(snr_all_aux_filled[h_id-1,t_id]) and ~numpy.isnan(snr_all_aux_filled[h_id+1,t_id]):
+            snr_all_aux_filled[h_id,t_id] = (snr_all_aux_filled[h_id-1,t_id]+snr_all_aux_filled[h_id+1,t_id])/2
+
 mask = numpy.isnan(coh_all_aux_filled.T)
 #mask[50:54,200:350] = True # Oct 1
 #mask[56:58,80:200] = True # Oct 1
 #mask[78:86,:] = True # Oct 3
 #mask[78:,:150] = True # Oct 3
-snr_all_aux = (_power[0, :xlim, :] - _noise[0, :xlim][:, numpy.newaxis])/_noise[0, :xlim][:, numpy.newaxis]
-snr_all_aux = numpy.where(snr_all_aux > HIGH_SNR_LIM ,numpy.nan,snr_all_aux)
-mask_snr = numpy.isnan(snr_all_aux)
+
+mask_snr = numpy.isnan(snr_all_aux_filled.T)
+#snr_all_aux = numpy.where(snr_all_aux > HIGH_SNR_LIM ,numpy.nan,snr_all_aux)
+#mask_snr = numpy.isnan(snr_all_aux)
 
 den = numpy.where(mask ,numpy.nan,den)
 den = numpy.where(mask_snr ,numpy.nan,den)
@@ -585,18 +598,18 @@ fig = plt.figure(figsize=(15,5))
 ax = fig.add_subplot(221)
 df_x = pd.DataFrame(data=utctime_all[:], columns=["Dates"])
 df_x['Dates'] = pd.to_datetime(df_x['Dates'], unit='s', errors='coerce')
-RTI = ax.pcolormesh(df_x['Dates'][:xlim],heightList,coh_all[:xlim].T,cmap='jet',vmin=0,vmax=700)
+RTI = ax.pcolormesh(df_x['Dates'][:xlim],heightList,coh_all[:xlim].T,cmap='jet',vmin=0,vmax=.01) # 700 when bad normalizing
 date_format = mdates.DateFormatter('%H:%M')
 ax.xaxis.set_major_formatter(date_format)
 fig.colorbar(RTI)
 
 ax2 = fig.add_subplot(222)
-RTI_aux = ax2.pcolormesh(df_x['Dates'][:xlim],heightList,coh_all_aux[:xlim].T,cmap='jet',vmin=0,vmax=700)
+RTI_aux = ax2.pcolormesh(df_x['Dates'][:xlim],heightList,coh_all_aux[:xlim].T,cmap='jet',vmin=0,vmax=.01)
 fig.colorbar(RTI_aux)
 ax2.xaxis.set_major_formatter(date_format)
 
 ax3 = fig.add_subplot(224)
-RTI_aux_3 = ax3.pcolormesh(df_x['Dates'][:xlim],heightList,coh_all_aux_filled,cmap='jet',vmin=0,vmax=700)
+RTI_aux_3 = ax3.pcolormesh(df_x['Dates'][:xlim],heightList,coh_all_aux_filled,cmap='jet',vmin=0,vmax=.01)
 fig.colorbar(RTI_aux_3)
 ax3.xaxis.set_major_formatter(date_format)
 plt.title("Coherence RTI")

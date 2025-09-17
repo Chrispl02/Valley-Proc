@@ -71,6 +71,7 @@ def set_bki(year, month, day, hour, minute, second, heightList):
 
     #from schainpy.model.proc import mkfact_short_2020_2
     import mkfact_short_2020_2
+    print("mkfact location", mkfact_short_2020_2)
     mkfact_short_2020_2.mkfact(year, h, bfm, thb, bki, MAXNRANGENDT)
     return bki
     
