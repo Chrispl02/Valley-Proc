@@ -246,3 +246,12 @@ def getVelRange(Vmax, nFFTPoints, ippFactor, extrapoints=0):
     velrange = deltav * (numpy.arange(nFFTPoints + extrapoints) - nFFTPoints / 2.)
 
     return velrange
+
+def fill_nan_linear(arr):
+    a = arr.copy()
+    n = numpy.isnan(a)
+    if n.all():
+        return a
+    x = numpy.arange(len(a))
+    a[n] = numpy.interp(x[n], x[~n], a[~n])
+    return a

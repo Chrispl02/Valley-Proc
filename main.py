@@ -24,7 +24,7 @@ matplotlib.use("Agg")
 script_dir = os.path.dirname(os.path.abspath(sys.argv[0]))
 os.chdir(script_dir)
 
-from utils import unwrap_with_nan, h5_tree, set_bki, normal, read_hf_file, getNoise, getPower, getVelRange
+from utils import set_bki, normal, read_hf_file, getNoise, getPower, getVelRange, fill_nan_linear
 from write_utils import write_routine
 #plt.show = lambda: None  # Override plt.show to do nothing
 
@@ -32,18 +32,16 @@ from write_utils import write_routine
 #####################################################################
 #
 #
-#
 global heightList
-dirr = '/media/cportilla/HDD/Valley/FaradayInt/d2024278/'
-#dirr = '/media/cportilla/HDD/Valley/FaradayInt/1min/d2024276/'
-#irr = '/media/cportilla/HDD/Valley/2024_05/spc/FaradayInt/d2024150/'
-dirr = '/media/cportilla/HDD/Data/Valley/08_13_pair23/d2025225/'
+group = '08_13_pair01'
+dirr = '/media/cportilla/HDD/Data/Valley/'+ group + '/d2025225/'
 #--- Read Data
 utctime_all = []
 all_files=os.listdir(dirr) #Get the list of all files in directory
 files = [ fname for fname in all_files if fname.endswith('.hdf5')]
 files=sorted(files) #Sort the files in ascending numerical order
 print("files: ", files)
+
 # Initialize empty NumPy arrays for all variables
 spc_aux = None
 cspc_aux = None
@@ -83,8 +81,8 @@ cspc = cspc_aux
 data_spc = numpy.array(spc)
 data_cspc = numpy.array(cspc)
 
-print(data_spc.shape)
-print(data_cspc.shape)
+print("data_spc.shape ", data_spc.shape)
+print("data_cspc.shape ", data_cspc.shape)
 spc = data_spc
 cspc = data_cspc
 
@@ -137,21 +135,20 @@ xrange = getVelRange(Vmax, nFFTPoints, ippFactor, 0) # numpy.arange(0, spc.shape
     plt.show()'''
 
 # Heights 72 km to 396 km w/ 3km space
-print("alert")
+print("Caculating Noise ...")
 _power = numpy.array( [getPower(spc[0], normFactor) , getPower(spc[1], normFactor)]  )#[:]
 _noise = numpy.array([
     10 * numpy.log10(getNoise(spc[:, i, :, :], ymin_index=55, ymax_index=75) / normFactor)
     for i in range(len(utctime))
 ]).T
 
-print("alert")
+print("Finished")
 ### 
 cspc_ch0 = cspc[0] #'First Pair'
 print("cspc_ch0.shape", cspc_ch0.shape)
 #print(heightList[220])
 
 #-- Limit heigh
-h_id_min = 41 #41
 h_id_min = 0 #200
 h_id_max = heightList.shape[0]
 
@@ -201,9 +198,6 @@ if remove_low_coh:
 #--- Calculate Data from spectra. Power coherence phase
 
 ccf = numpy.mean(cspc_ch0,axis=-2)
-if 0:
-    ccf = numpy.where(coh_allAux<LOW_COH_LIM,numpy.nan,ccf) # Filtering of low coherence echoes
-    
 ccf = signal.medfilt2d(ccf.real,kernel_size=5) + 1j * signal.medfilt2d(ccf.imag,kernel_size=5)
 
 powa = numpy.mean(spc[0],axis=-2)
@@ -229,17 +223,11 @@ print("phase_all.shape", phase_all.shape)
 phase_all = phase_all[:,h_id_min:h_id_max]
 coh_all = coh_all[:,h_id_min:h_id_max]
 heightList = heightList[h_id_min:h_id_max]
-powa =  powa[:,h_id_min:h_id_max]
+
+'''powa =  powa[:,h_id_min:h_id_max]
 powb =  powb[:,h_id_min:h_id_max]
-
-power = powa + powb
+power = powa + powb'''
 #--
-if 0:
-    phase_all_mean = (numpy.roll(phase_all,1)+numpy.roll(phase_all,-1))/2
-    #phase_all = phase_all_mean
-    #phase_all = numpy.where(coh_all<.002,phase_all_mean,phase_all)
-    #coh_all = numpy.where(coh_all<.002,numpy.nan,coh_all)
-
 
 # Spectra arranged in the order of: Channel, DataTime, FFTPoint, Heigh 
 
@@ -290,39 +278,10 @@ if year == 2025 and month == 8 and day == 13:
     snr_all_aux_filled[70:74,126:135] = numpy.nan; snr_all_aux_filled[69:74,129:135] = numpy.nan
     snr_all_aux_filled[70:72,148:160] = numpy.nan ; snr_all_aux_filled[71:74,152:161] = numpy.nan
 
-#--- SpectraDatatoFaraday
-
-#self.dataLag_spc=(dataOut.dataLag_spc.sum(axis=1))*(dataOut.rnint2[0]/dataOut.nProfiles)
-#self.dataLag_cspc=(dataOut.dataLag_cspc.sum(axis=1))*(dataOut.rnint2[0]/dataOut.nProfiles)
-tmpx_a2 = spc[0].sum(axis=1).real
-tmpx_5 = None
-tmpx_b2 = spc[1].sum(axis=1).real
-tmpx_7 = None
-pa_2=numpy.abs(tmpx_a2) # +tmpx_5
-pb_2=numpy.abs(tmpx_b2) # +tmpx_7
-pas_2 = []
-pbs_2 = []
-# obtained power power2 = pa_2 + pb_2  is the same that usual power with mean
-
-for i in range(len(utctime)):
-    noise = 10*numpy.log10(getNoise(numpy.array(spc)[:,i,:,:], ymin_index=50) /normFactor)
-    pas_2.append(noise[0]*numpy.ones(numpy.shape(pa_2[1])[0]))
-    pbs_2.append(noise[1]*numpy.ones(numpy.shape(pa_2[1])[0]))
-
-power2 = pa_2 + pb_2 #- pas_2 - pbs_2 # - noises
-# dataOut.tnoise = dataOut.noise_lag/float(dataOut.nProfiles*dataOut.nIncohInt)
 
 ###########################
 #--- Valley Processing ---#
 ###########################
-def fill_nan_linear(arr):
-    a = arr.copy()
-    n = numpy.isnan(a)
-    if n.all():
-        return a
-    x = numpy.arange(len(a))
-    a[n] = numpy.interp(x[n], x[~n], a[~n])
-    return a
 
 from scipy.ndimage import gaussian_filter1d
 
@@ -331,8 +290,7 @@ dphi = numpy.ones((phase_all.shape[0],phase_all.shape[1]))*numpy.nan
 den = numpy.ones((phase_all.shape[0],phase_all.shape[1]))*numpy.nan
 phase_spline = numpy.ones((phase_all.shape[0],phase_all.shape[1]))*numpy.nan
 ###
-den_power = numpy.copy(power)
-den_power2 = numpy.copy(power2)
+
 id_h_lower, id_h_upper = None, None
 
 for idx, phase_t_aux in enumerate(phase_all):
@@ -363,12 +321,7 @@ for idx, phase_t_aux in enumerate(phase_all):
     
     #if heightList[id_h_lower] < 100: id_h_lower = numpy.abs(heightList - 100).argmin()
     
-    #Always smoothing after the unwrapping 
-    ## High-Order interpolation
-    #tck_s = interpolate.splrep(heightList[id_h_lower:id_h_upper], numpy.unwrap(phase_t[id_h_lower:id_h_upper]), s=2*360, k=4) ##
-    #phase_spline[idx,id_h_lower:id_h_upper] = interpolate.splev(heightList[id_h_lower:id_h_upper], tck_s)
-    
-    # Gaussian Filter
+    # 1st Gaussian Fitting and Filtering - to check the gradient tendency of the data
     phase_spline[idx,id_h_lower:id_h_upper] = gaussian_filter1d(numpy.unwrap(phase_t[id_h_lower:id_h_upper], discont = discont), sigma=5) ## 15
     dev = numpy.gradient(phase_spline[idx])
     mask = numpy.where(numpy.array(dev) > 0)[0]
@@ -380,6 +333,7 @@ for idx, phase_t_aux in enumerate(phase_all):
     phase_spline[idx,:id_h_lower] = None
     #phase_spline[idx,id_h_upper:] = None
 
+    # 2nd Fitting
     phase_spline[idx,id_h_lower:id_h_upper] = gaussian_filter1d(numpy.unwrap(phase_t[id_h_lower:id_h_upper], discont = discont), sigma=8,
                                                 mode='nearest') ## 15
 
@@ -389,6 +343,11 @@ for idx, phase_t_aux in enumerate(phase_all):
 
     #spline = csaps.CubicSmoothingSpline(heightList[id_h_lower:id_h_upper], phase_t[id_h_lower:id_h_upper], smooth=0.8)
     
+    # Coherent echoe correction
+    '''
+    Block in case of coherent echoe in Valley data in the ISR region, it detect by snr tressholding and tries to dont incorpore in the 
+    phase fitting
+    '''
     aux = numpy.where(numpy.isnan(snr_all_aux_filled[id_h_lower:id_h_upper,idx]))[0]
     if snr_thr and len(aux) > 0:
         
@@ -410,13 +369,6 @@ for idx, phase_t_aux in enumerate(phase_all):
         phase_spline[idx, seg_slice] = seg_smooth
         #phase_spline[idx, seg_slice][~mask_valid] = numpy.nan
         
-        #except: phase_t[id_h_lower + aux[0]: id_h_lower + aux[-1]+1] = [numpy.nan if aux for i in range(phase_t[id_h_lower + aux[0]: id_h_lower + aux[-1]+1])]
-        #phase_spline[idx,id_h_lower:id_h_upper] = gaussian_filter1d(numpy.unwrap(phase_t[id_h_lower:id_h_upper], discont = discont), sigma=5)
-    
-
-
-    #'''
-    #dphi[idx] = interpolate.splev(heightList, tck_s, der=1)
 
     #if idx in [200,220,221,222]:
     #if  idx > 200 and idx < 250 or idx == 133 or (idx in [129,130,131,132,133,134,135]):
@@ -447,7 +399,7 @@ for idx, phase_t_aux in enumerate(phase_all):
         den[idx,i]=dphi[idx,i]*abs(fact) 
 
         if snr_thr and len(aux) > 0:
-            #bad_dphi = numpy.any(numpy.isin(i, global_aux + 1)) or numpy.any(numpy.isin(i, global_aux - 1))
+            #bad_dphi = numpy.any(numpy.isin(i, global_aux + 1)) or numpy.any(numpy.isin(i, global_aux - 1)) # +-1 data
             bad_dphi = numpy.any(numpy.abs(global_aux - i) <= 2)
             if bad_dphi: 
                 den[idx,i] = None
@@ -478,59 +430,6 @@ den[den > 1.5e+6] = numpy.nan
 dphi = numpy.where(mask,numpy.nan,dphi)
 phase_spline = numpy.where(mask ,numpy.nan,phase_spline)
 
-# Normalize Power
-'''for idx,utime in enumerate(utctime_all):
-    #if (utime>=11.5 and utime<23): # 6 30am to 6pm
-    if True:
-        i2=(390.-heightList[0])/DH
-        i1=(250.-heightList[0])/DH
-
-    try:
-        heightList[i2]
-    except:
-        i2 -= 1
-
-
-    i1=int(i1);i2=int(i2)
-    print("Bounds 1: ", heightList[i1],heightList[i2])
-
-    try:
-        cf= normal(den[idx,i1:i2], den_power[idx,i1:i2], i2-i1, 1)
-    except Exception as e:
-        print(f"Exception occurred: {e}")
-        print("except: chi factor not achieved in normalization")
-        cf = numpy.nan
-    
-    try:
-        cf2= normal(den[idx,i1:i2], den_power2[idx,i1:i2], i2-i1, 1)
-    except Exception as e:
-        print(f"Exception occurred: {e}")
-        print("except: chi factor not achieved in normalization")
-        cf2 = numpy.nan
-    
-    #print("power[utime,:]",power[id,:])
-    den_power[idx,:] *= cf
-    den_power2[idx,:] *= cf2
-    print("cf",cf, idx, i2-i1, i1 , i2)'''
-
-
-
-# only to plot a sample - Power profiles
-'''idx_list = [60,70,80,100,150,200]
-for idx in idx_list:
-    fig = plt.figure(figsize=(5,8))
-    ax = fig.add_subplot(111)
-    #ax.plot((phase_t[id_h_lower:id_h_upper]),heightList[id_h_lower:id_h_upper])
-    ax.plot(den[idx,id_h_lower:id_h_upper],heightList[id_h_lower:id_h_upper],'--')
-    print( "###")
-    print(den_power, den_power.shape)
-    print(den_power2, den_power2.shape)
-    ax.plot(den_power[idx,id_h_lower:id_h_upper],heightList[id_h_lower:id_h_upper])
-    ax.plot(den_power2[idx,id_h_lower:id_h_upper],heightList[id_h_lower:id_h_upper],'--')
-    ax.legend(['Faraday','Power', 'Power2'])
-    plt.title('{0} {1}'.format(time.ctime(utctime_all[idx]), idx))
-plt.show()'''
-
 
 ################
 ### PLOTTING ###
@@ -556,7 +455,7 @@ plt.title('Smoothed Phase RTI')
 
 
 #--- Coherence Plot
-fig = plt.figure(figsize=(15,5))
+'''fig = plt.figure(figsize=(15,5))
 ax = fig.add_subplot(221)
 df_x = pd.DataFrame(data=utctime_all[:], columns=["Dates"])
 df_x['Dates'] = pd.to_datetime(df_x['Dates'], unit='s', errors='coerce')
@@ -576,7 +475,7 @@ fig.colorbar(RTI_aux_3)
 ax3.xaxis.set_major_formatter(date_format)
 plt.title("Coherence RTI")
 plt.tight_layout()
-plt.show()
+plt.show()'''
 
 
 
@@ -601,7 +500,7 @@ plt.show()'''
 
 #--- RTI Plot
 
-fig, ax = plt.subplots(2, 1, figsize=(9, 3.5), sharex=True)
+'''fig, ax = plt.subplots(2, 1, figsize=(9, 3.5), sharex=True)
 
 df_x = pd.DataFrame(data=utctime_all[:], columns=["Dates"])
 df_x['Dates'] = pd.to_datetime(df_x['Dates'], unit='s', errors='coerce')
@@ -619,7 +518,7 @@ for i in [0, 1]:
     fig.colorbar(RTI, ax=ax[i])
 
 ax[0].set_title("RTI")
-plt.show()
+plt.show()'''
 
 #--- SNR Plot
 
@@ -842,12 +741,8 @@ plt.show()
 
 
 
-
-
-
-exit(1)
 #-- Data contrast with VIPIR
-
+'''
 
 file_path = "/media/cportilla/HDD/PPP_code/scaled_2024_10_1.npz"
 data = numpy.load(file_path, allow_pickle=True)
@@ -860,7 +755,7 @@ TIME = data['TIME']
 
 isr_id = 50
 vipir_id = 191
-'''
+
 for isr_id in range(len(utctime)):
 
     vipir_id = numpy.argmin(numpy.abs((TIME - numpy.array(utctime[isr_id]))))
@@ -883,4 +778,4 @@ for isr_id in range(len(utctime)):
 ##### SAVE DATA ########
 ########################
 
-#write_routine(den, utctime, heightList, figpath='/media/cportilla/HDD/Valley/HDF5/')
+write_routine(den, utctime, heightList, figpath='/media/cportilla/HDD/Valley/HDF5/')
