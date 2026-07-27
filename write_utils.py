@@ -86,11 +86,23 @@ def writeBlock(fp,utctime, extra_args):
         for key, value in list(twoDDict.items()):
             if isinstance(value, str):
                 data = getattr(dataOut, value)
-                invalid = numpy.isnan(data)
+                invalid = numpy.isnan(value)
                 data[invalid] = missing
             elif isinstance(value, (tuple, list)):
                 attr, key = value
                 data = getattr(dataOut, attr)
+                invalid = numpy.isnan(data)
+                data[invalid] = missing'''
+
+    '''if ext == '.hdf5':
+        for key, value in list(twoDDict.items()):
+            if isinstance(value, str):
+                data = globals()[value][0]
+                invalid = numpy.isnan(value)
+                data[invalid] = missing
+            elif isinstance(value, (tuple, list)):
+                attr, key = value
+                data = globals()[attr][0]
                 invalid = numpy.isnan(data)
                 data[invalid] = missing'''
 
@@ -219,6 +231,9 @@ def write_routine(den, time, height, figpath='/media/cportilla/HDD/Valley/HDF5/'
     global lat, lon, paramInterval, DensityFinal, ind2DList, oneDDict, twoDDict, metadata
     global MNEMONICS, kinst, utctime, ext, path, kindat, keys, heightList, catalog, _header
     global fullname
+    global missing
+    missing = -32767 # see if we can change by nan without breaking MadrigalData
+
     utctime = time
     heightList = height
     DEF_CATALOG = {
@@ -280,7 +295,7 @@ def write_routine(den, time, height, figpath='/media/cportilla/HDD/Valley/HDF5/'
                 'sciRemarks': file_contents
                 },
             'header': {
-                'analyst': 'D. Hysell'
+                'analyst': 'C. Portilla'
             }
         }
         f.close()
@@ -295,6 +310,11 @@ def write_routine(den, time, height, figpath='/media/cportilla/HDD/Valley/HDF5/'
         metadata = meta
 
         DensityFinal = [den[idx]]
+        #DensityFinal[numpy.isnan(DensityFinal)] = missing
+        DensityFinal = numpy.array(DensityFinal, dtype=float)
+        DensityFinal[numpy.isnan(DensityFinal)] = missing
+
+        print("DensityFinal", numpy.shape(DensityFinal))
 
         path = figpath
         oneDDict = load_json(one)

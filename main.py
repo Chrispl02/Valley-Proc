@@ -33,7 +33,7 @@ from write_utils import write_routine
 #
 #
 global heightList
-group = '08_13_pair01'
+group = '08_13_pair23'
 dirr = '/media/cportilla/HDD/Data/Valley/'+ group + '/d2025225/'
 #--- Read Data
 utctime_all = []
@@ -108,7 +108,7 @@ Vmax = 2*Va(420, 1)
 ippFactor = 1
 xrange = getVelRange(Vmax, nFFTPoints, ippFactor, 0) # numpy.arange(0, spc.shape[2], 1)
 
-'''for i in range(120,140):
+for i in range(120,140):
     idx = (0, i)
     fig, (ax1, ax2) = plt.subplots(1, 2, figsize=(5, 4), gridspec_kw={'width_ratios': [4, 1]}, sharey=True)
 
@@ -119,20 +119,21 @@ xrange = getVelRange(Vmax, nFFTPoints, ippFactor, 0) # numpy.arange(0, spc.shape
 
     ax1.set_title(time.ctime(utctime[idx[1]]))
     ax1.set_xlabel("Velocity (m/s)")
-    ax1.set_ylabel("Height")
+    ax1.set_ylabel("Height (km)")
     # Power Profile
 
     profile = getPower(spc[idx[0]], normFactor)[idx[1]]  #numpy.mean(spc[idx], axis=0) 
-    noise = 10*numpy.log10(getNoise(numpy.array(spc)[:,idx[1],:,:], ymin_index=50) /normFactor)[idx[0]]
+    noise = 10*numpy.log10(getNoise(numpy.array(spc)[:,idx[1],:,:], ymin_index=20, ymax_index=45) /normFactor)[idx[0]]
 
     ax2.plot(profile, heightList, 'r-')
     ax2.axvline(x = noise, color="black", linestyle="--")
-    ax2.set_xlim([0.95*numpy.min(profile),1.02*numpy.median(profile)])
+    ax2.set_xlim([0.99*numpy.min(profile),1.01*numpy.median(profile)])
+    ax2.set_xlabel("dB")
     ax2.grid()
 
     plt.tight_layout()
     plt.savefig(f'frame_{i}.png')
-    plt.show()'''
+    plt.show()
 
 # Heights 72 km to 396 km w/ 3km space
 print("Caculating Noise ...")
@@ -155,6 +156,7 @@ h_id_max = heightList.shape[0]
 #--- Remove low coherence mode ---
 LOW_COH_LIM = 4.5e-3 #1.8e-3 #4e-3
 HIGH_SNR_LIM = 1.8e-3 #2
+SNR_THR = False
 RATE = 1.8978873*1e-6
 DH = heightList[1]-heightList[0]
 
@@ -249,8 +251,6 @@ bki = set_bki(year, month, day, hour, minute, second, heightList)
 """ Cleaning by Coherence filtering LOW_COH_LIM and by 
 snr tresshold HIGH_SNR_LIM (optional, only for coherent echoes in ISR)"""
 
-snr_thr = True
-
 coh_all_aux = signal.medfilt2d(coh_all,kernel_size=9) #coh_all.copy()
 coh_all_aux = signal.medfilt2d(coh_all_aux,kernel_size=7) 
 coh_all_aux = numpy.where(coh_all_aux < LOW_COH_LIM ,numpy.nan,coh_all_aux) # .0025
@@ -268,13 +268,12 @@ for t_id in range(coh_all_aux_filled.shape[1]):
         if numpy.isnan(coh_all_aux_filled[h_id,t_id]) and ~numpy.isnan(coh_all_aux_filled[h_id-1,t_id]) and ~numpy.isnan(coh_all_aux_filled[h_id+1,t_id]):
             coh_all_aux_filled[h_id,t_id] = (coh_all_aux_filled[h_id-1,t_id]+coh_all_aux_filled[h_id+1,t_id])/2
 
-        if snr_thr and numpy.isnan(snr_all_aux_filled[h_id,t_id]) and ~numpy.isnan(snr_all_aux_filled[h_id-1,t_id]) and ~numpy.isnan(snr_all_aux_filled[h_id+1,t_id]):
+        if SNR_THR and numpy.isnan(snr_all_aux_filled[h_id,t_id]) and ~numpy.isnan(snr_all_aux_filled[h_id-1,t_id]) and ~numpy.isnan(snr_all_aux_filled[h_id+1,t_id]):
             snr_all_aux_filled[h_id,t_id] = (snr_all_aux_filled[h_id-1,t_id]+snr_all_aux_filled[h_id+1,t_id])/2
 
 # Manual Cleaning
 if year == 2025 and month == 8 and day == 13: 
     print("Manual cleaning")
-    print()
     snr_all_aux_filled[70:74,126:135] = numpy.nan; snr_all_aux_filled[69:74,129:135] = numpy.nan
     snr_all_aux_filled[70:72,148:160] = numpy.nan ; snr_all_aux_filled[71:74,152:161] = numpy.nan
 
@@ -325,7 +324,7 @@ for idx, phase_t_aux in enumerate(phase_all):
     phase_spline[idx,id_h_lower:id_h_upper] = gaussian_filter1d(numpy.unwrap(phase_t[id_h_lower:id_h_upper], discont = discont), sigma=5) ## 15
     dev = numpy.gradient(phase_spline[idx])
     mask = numpy.where(numpy.array(dev) > 0)[0]
-    print(len(mask))
+
     if len(mask) != 0 and (time.gmtime(utctime[idx]).tm_hour < 11 or time.gmtime(utctime[idx]).tm_hour > 22):
         print("entered")
         id_h_lower = mask[0]
@@ -334,12 +333,12 @@ for idx, phase_t_aux in enumerate(phase_all):
     #phase_spline[idx,id_h_upper:] = None
 
     # 2nd Fitting
-    phase_spline[idx,id_h_lower:id_h_upper] = gaussian_filter1d(numpy.unwrap(phase_t[id_h_lower:id_h_upper], discont = discont), sigma=8,
-                                                mode='nearest') ## 15
+    #phase_spline[idx,id_h_lower:id_h_upper] = gaussian_filter1d(numpy.unwrap(phase_t[id_h_lower:id_h_upper], discont = discont), sigma=8,
+    #                                            mode='nearest') ## 15
 
     
-    #tck_s = interpolate.splrep(heightList[id_h_lower:id_h_upper], numpy.unwrap(phase_t[id_h_lower:id_h_upper]), s=2*360, k=4) ##
-    #phase_spline[idx,id_h_lower:id_h_upper] = interpolate.splev(heightList[id_h_lower:id_h_upper], tck_s)
+    tck_s = interpolate.splrep(heightList[id_h_lower:id_h_upper], numpy.unwrap(phase_t[id_h_lower:id_h_upper]), s=2*360, k=4) ##
+    phase_spline[idx,id_h_lower:id_h_upper] = interpolate.splev(heightList[id_h_lower:id_h_upper], tck_s)
 
     #spline = csaps.CubicSmoothingSpline(heightList[id_h_lower:id_h_upper], phase_t[id_h_lower:id_h_upper], smooth=0.8)
     
@@ -349,7 +348,7 @@ for idx, phase_t_aux in enumerate(phase_all):
     phase fitting
     '''
     aux = numpy.where(numpy.isnan(snr_all_aux_filled[id_h_lower:id_h_upper,idx]))[0]
-    if snr_thr and len(aux) > 0:
+    if SNR_THR and len(aux) > 0:
         
         global_aux = aux + id_h_lower
         mask_valid = ~ numpy.isnan(snr_all_aux_filled[id_h_lower:id_h_upper,idx])
@@ -372,7 +371,8 @@ for idx, phase_t_aux in enumerate(phase_all):
 
     #if idx in [200,220,221,222]:
     #if  idx > 200 and idx < 250 or idx == 133 or (idx in [129,130,131,132,133,134,135]):
-    if  idx > 110 and idx < 170:
+    #if  idx > 110 and idx < 170:
+    if idx == 0 or idx == 1:
         plt.figure(figsize=(5,6))
         test = phase_t_aux
         phase_t_un = numpy.unwrap(phase_t, discont=discont)  #unwrap_with_nan(test)
@@ -385,7 +385,7 @@ for idx, phase_t_aux in enumerate(phase_all):
         plt.axhline(heightList[id_h_lower], color='gray', linestyle='--')
         plt.axhline(heightList[id_h_upper], color='gray', linestyle='--')
         plt.title('{0} {1}'.format(time.ctime(utctime_all[idx]), idx))
-        plt.savefig(f'{idx}_interpol.png')
+        plt.savefig(f'{idx}_interpol_.png')
         plt.close()
 
 
@@ -398,7 +398,7 @@ for idx, phase_t_aux in enumerate(phase_all):
 
         den[idx,i]=dphi[idx,i]*abs(fact) 
 
-        if snr_thr and len(aux) > 0:
+        if SNR_THR and len(aux) > 0:
             #bad_dphi = numpy.any(numpy.isin(i, global_aux + 1)) or numpy.any(numpy.isin(i, global_aux - 1)) # +-1 data
             bad_dphi = numpy.any(numpy.abs(global_aux - i) <= 2)
             if bad_dphi: 
@@ -426,7 +426,7 @@ mask_snr = numpy.isnan(snr_all_aux_filled.T)
 den = numpy.where(mask ,numpy.nan,den)
 den = numpy.where(mask_snr ,numpy.nan,den)
 den[den < 1e+4] = numpy.nan
-den[den > 1.5e+6] = numpy.nan
+den[den > 2.2e+6] = numpy.nan
 dphi = numpy.where(mask,numpy.nan,dphi)
 phase_spline = numpy.where(mask ,numpy.nan,phase_spline)
 
@@ -522,7 +522,7 @@ plt.show()'''
 
 #--- SNR Plot
 
-fig, ax = plt.subplots(2, 1, figsize=(9, 3.5), sharex=True)
+'''fig, ax = plt.subplots(2, 1, figsize=(9, 3.5), sharex=True)
 
 df_x = pd.DataFrame(data=utctime_all[:], columns=["Dates"])
 df_x['Dates'] = pd.to_datetime(df_x['Dates'], unit='s', errors='coerce')
@@ -541,7 +541,7 @@ for i in [0, 1]:
     fig.colorbar(RTI, ax=ax[i])
 
 ax[0].set_title("RTI")
-plt.show()
+plt.show()'''
 
 
 #--- Gradient Plot
@@ -564,7 +564,7 @@ ax = fig.add_subplot(111)
 df_x = pd.DataFrame(data=utctime_all[:], columns=["Dates"])
 df_x['Dates'] = pd.to_datetime(df_x['Dates'], unit='s', errors='coerce')
 
-RTI = ax.pcolormesh(df_x['Dates'][:xlim],heightList,dphi[:xlim].T,cmap='plasma',vmin=-0.04,vmax=.1) # .07
+RTI = ax.pcolormesh(df_x['Dates'][:xlim],heightList,dphi[:xlim].T,cmap='plasma',vmin=-0.04,vmax=.15) # .07
 #RTI = ax.pcolormesh(df_x['Dates'][:xlim],heightList,signal.medfilt2d(dphi[:xlim].T),cmap='Blues',vmin=0,vmax=.04)
 
 date_format = mdates.DateFormatter('%H:%M')
@@ -575,11 +575,11 @@ plt.title("Dphi RTI")
 #plt.show()
 
 
-limit_date = df_x['Dates'][:xlim][0::6]
+'''limit_date = df_x['Dates'][:xlim][0::6]
 heights_VIPIR = [536.6,505,456,313,328,338,339,313,336,numpy.nan,282,337,280,290,numpy.nan,312,350,185,numpy.nan,330,numpy.nan,434,447,numpy.nan]
 heights_VIPIR = heights_VIPIR[:19]
 heights_VIPIR = numpy.array([285.3,296.7,309.5,294.1,330.9,292.8,291.1,326.2,311.9,285.3,294.3,298.6,290.2,287.2,282.6,338.8,271.3,294.7,305.4,289.8,322.8,297.0,273.3,310.1,300.5,321.0,297.2,304.8,321.0,293.4,285.0,303.2,289.6,320.6,291.7,312.2,299.7,332.6,297.4,308.4,312.7,319.7,338.6,322.5,334.8,347.2,340.7,362.2,356.0,353.4,358.1,377.0,376.7,372.6,365.1,378.2,386.9,377.5,375.7,387.4,380.4,383.0,396.1,404.1,389.7,401.7,397.2,390.0,388.9,392.4,374.1,405.4,384.5,388.5,390.4,405.5,423.6,419.0,416.6,414.9,387.7,410.0,400.0,395.5,369.3,347.6,338.2,351.5,389.2,336.8,332.1,366.2,354.9,351.7])
-
+'''
 #--- Density Plot
 #plt.style.use('dark_background')
 fig = plt.figure(figsize=(9,3.5))
@@ -639,7 +639,7 @@ fig.colorbar(RTI)
 plt.show()#
 
 #-- Density & magnetometer
-import numpy as np
+'''import numpy as np
 
 LISN_dir = '/media/cportilla/HDD/Valley/LISN_magnetometer/' + 'jica_250813.sec'
 
@@ -698,8 +698,8 @@ datetime_array = [
 LTime2 = [datetime.fromtimestamp(ts, timezone.utc) - timedelta(hours=5) for ts in utctime]
 LTime2 = [t.astimezone(GMT_minus_5)for t in LTime2]
 # Example: print the output
-'''for dt in datetime_array:
-    print(dt)'''
+
+
 # Slice the range first
 time_slice = datetime_array[50000:80000]
 H_slice = H[50000:80000]
@@ -736,7 +736,7 @@ plt.xlabel('Time')
 plt.tight_layout()
 plt.legend()
 #plt.savefig("Overlay_SameAxis.png")
-plt.show()
+plt.show()'''
 
 
 
@@ -778,4 +778,4 @@ for isr_id in range(len(utctime)):
 ##### SAVE DATA ########
 ########################
 
-write_routine(den, utctime, heightList, figpath='/media/cportilla/HDD/Valley/HDF5/')
+#write_routine(den, utctime, heightList, figpath='/media/cportilla/HDD/Valley/HDF5/' + group + '/')
