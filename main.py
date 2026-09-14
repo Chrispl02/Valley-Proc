@@ -1,5 +1,5 @@
 from doctest import ELLIPSIS_MARKER
-from this import d
+#from this import d
 import pandas as pd
 import matplotlib
 import matplotlib.pyplot as plt
@@ -26,15 +26,15 @@ os.chdir(script_dir)
 
 from utils import set_bki, normal, read_hf_file, getNoise, getPower, getVelRange, fill_nan_linear
 from write_utils import write_routine
-#plt.show = lambda: None  # Override plt.show to do nothing
 
 
-#####################################################################
-#
-#
 global heightList
-group = '08_13_pair23'
-dirr = '/media/cportilla/HDD/Data/Valley/'+ group + '/d2025225/'
+
+dirr = '/home/david/Documents/DATA-2/Valley/25_28_Aug_26/28_Aug_26/d2026240/'
+output_dir = '/home/david/Documents/DATA-3/Valley/25_28_Aug_26/28_Aug_26/main-2'
+os.makedirs(output_dir, exist_ok=True)
+
+
 #--- Read Data
 utctime_all = []
 all_files=os.listdir(dirr) #Get the list of all files in directory
@@ -100,7 +100,7 @@ cspc[:, :, 48, :] = numpy.mean(numpy.delete(cspc, [16, 48], axis=2), axis=2)
 
 # Spectra arranged in the order of: Channel, DataTime, FFTPoint, Heigh 
 #--- Spectra Plot  # [0,20] -> channel 0 time index 20
-normFactor = 900 * 64 # nInt * nProfiles
+normFactor = 120*64 #900 * 64 # nInt * nProfiles
 global nFFTPoints, ippFactor, Vmax
 nFFTPoints = 64
 Va = lambda IPP, nCohInt: 6 / (4*nCohInt*(2*IPP*1e+3)/3e+8)
@@ -108,7 +108,9 @@ Vmax = 2*Va(420, 1)
 ippFactor = 1
 xrange = getVelRange(Vmax, nFFTPoints, ippFactor, 0) # numpy.arange(0, spc.shape[2], 1)
 
-for i in range(120,140):
+# for i in range(120,140):
+# Cambio dinamico de i -> len(utctime)
+for i in range(len(utctime)):
     idx = (0, i)
     fig, (ax1, ax2) = plt.subplots(1, 2, figsize=(5, 4), gridspec_kw={'width_ratios': [4, 1]}, sharey=True)
 
@@ -132,7 +134,11 @@ for i in range(120,140):
     ax2.grid()
 
     plt.tight_layout()
-    plt.savefig(f'frame_{i}.png')
+    plt.savefig(
+    os.path.join(output_dir, f'frame_{i}.png'),
+    dpi=300,
+    bbox_inches='tight'
+)
     plt.show()
 
 # Heights 72 km to 396 km w/ 3km space
@@ -336,9 +342,19 @@ for idx, phase_t_aux in enumerate(phase_all):
     #phase_spline[idx,id_h_lower:id_h_upper] = gaussian_filter1d(numpy.unwrap(phase_t[id_h_lower:id_h_upper], discont = discont), sigma=8,
     #                                            mode='nearest') ## 15
 
-    
-    tck_s = interpolate.splrep(heightList[id_h_lower:id_h_upper], numpy.unwrap(phase_t[id_h_lower:id_h_upper]), s=2*360, k=4) ##
-    phase_spline[idx,id_h_lower:id_h_upper] = interpolate.splev(heightList[id_h_lower:id_h_upper], tck_s)
+    x = heightList[id_h_lower:id_h_upper]
+    y = numpy.unwrap(phase_t[id_h_lower:id_h_upper], discont=discont)
+
+    if len(x) < 5:
+        continue
+
+    tck_s = interpolate.splrep(x, y, s=2*360, k=4)
+
+    phase_spline[idx,id_h_lower:id_h_upper] = interpolate.splev(x, tck_s)
+    ###Cambio
+    #tck_s = interpolate.splrep(heightList[id_h_lower:id_h_upper], numpy.unwrap(phase_t[id_h_lower:id_h_upper]), s=2*360, k=4) ##
+    #phase_spline[idx,id_h_lower:id_h_upper] = interpolate.splev(heightList[id_h_lower:id_h_upper], tck_s)
+
 
     #spline = csaps.CubicSmoothingSpline(heightList[id_h_lower:id_h_upper], phase_t[id_h_lower:id_h_upper], smooth=0.8)
     
@@ -385,7 +401,11 @@ for idx, phase_t_aux in enumerate(phase_all):
         plt.axhline(heightList[id_h_lower], color='gray', linestyle='--')
         plt.axhline(heightList[id_h_upper], color='gray', linestyle='--')
         plt.title('{0} {1}'.format(time.ctime(utctime_all[idx]), idx))
-        plt.savefig(f'{idx}_interpol_.png')
+        plt.savefig(
+            os.path.join(output_dir, f'{idx}_interpol_.png'),
+            dpi=300,
+            bbox_inches='tight'
+        )
         plt.close()
 
 
@@ -582,7 +602,7 @@ heights_VIPIR = numpy.array([285.3,296.7,309.5,294.1,330.9,292.8,291.1,326.2,311
 '''
 #--- Density Plot
 #plt.style.use('dark_background')
-fig = plt.figure(figsize=(9,3.5))
+'''fig = plt.figure(figsize=(9,3.5))
 ax = fig.add_subplot(111)
 df_x = pd.DataFrame(data=utctime_all[:], columns=["Dates"])
 df_x['Dates'] = pd.to_datetime(df_x['Dates'], unit='s', errors='coerce')
@@ -593,8 +613,52 @@ RTI = ax.pcolormesh(df_x['Dates'][:xlim],heightList,den[:xlim].T,cmap='jet',norm
 date_format = mdates.DateFormatter('%H:%M')
 ax.xaxis.set_major_formatter(date_format)
 fig.colorbar(RTI)
-plt.title("Density RTI: "+str(day)+"/"+str(month)+"/"+str(year))
+plt.title("Density RTI: "+str(day)+"/"+str(month)+"/"+str(year))'''
 
+
+## Valores de densidad 
+print("DEN min:", numpy.nanmin(den))
+print("DEN max:", numpy.nanmax(den))
+print("DEN mean:", numpy.nanmean(den))
+print("DEN median:", numpy.nanmedian(den))
+print(numpy.nanpercentile(den, [1, 5, 25, 50, 75, 95, 99]))
+
+fig = plt.figure(figsize=(9, 3.5))
+ax = fig.add_subplot(111)
+
+df_x = pd.DataFrame(data=utctime_all[:], columns=["Dates"])
+df_x["Dates"] = pd.to_datetime(
+    df_x["Dates"],
+    unit="s",
+    errors="coerce"
+)
+
+RTI = ax.pcolormesh(
+    df_x["Dates"][:xlim],
+    heightList,
+    den[:xlim].T,
+    cmap="jet",
+    norm=colors.LogNorm(vmin=1e4, vmax=5e6)
+)
+
+date_format = mdates.DateFormatter("%H:%M")
+ax.xaxis.set_major_formatter(date_format)
+
+ax.set_xlabel("Time")
+ax.set_ylabel("Height (km)")
+ax.set_title(f"Electron Density RTI: {day}/{month}/{year}")
+
+fig.colorbar(RTI, label="Electron density (m⁻³)")
+
+plt.tight_layout()
+
+plt.savefig(
+    os.path.join(output_dir, "density_RTI.png"),
+    dpi=300,
+    bbox_inches="tight"
+)
+
+plt.close()
 
 
 
@@ -637,6 +701,13 @@ ax.xaxis.set_major_formatter(date_format)
 ax.set_title("Total Phase", fontsize=14)
 fig.colorbar(RTI)
 plt.show()#
+plt.savefig(
+    os.path.join(output_dir, 'total_phase.png'),
+    dpi=300,
+    bbox_inches="tight"
+)
+
+# plt.savefig('/home/david/Documents/DATA-2/Valley/25_28_Aug_26/26_Aug_26/hdf5/', dpi=300)
 
 #-- Density & magnetometer
 '''import numpy as np
@@ -778,4 +849,7 @@ for isr_id in range(len(utctime)):
 ##### SAVE DATA ########
 ########################
 
-#write_routine(den, utctime, heightList, figpath='/media/cportilla/HDD/Valley/HDF5/' + group + '/')
+write_routine(den, utctime, heightList, figpath=output_dir + '/hdf5/')
+
+## dirr = '/media/cportilla/HDD/Data/Valley/'+ group + '/d2025225/'
+#dirr = '/home/david/Documents/DATA-2/Valley/25_28_Aug_26/26_Aug_26-2/hdf5/'

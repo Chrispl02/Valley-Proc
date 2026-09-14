@@ -283,7 +283,9 @@ def write_routine(den, time, height, figpath='/media/cportilla/HDD/Valley/HDF5/'
             'gdalt': 'heightList',   #<----- nmonics
             'NE': ('DensityFinal', 0),
             } #writer
-        f=open('/media/cportilla/HDD/Valley/moder_test.txt','r')
+        # f=open('/media/cportilla/HDD/Valley/moder_test.txt','r')
+        f=open('/home/david/Documents/faraday-experiment/schain/moder_test.txt','r')
+        
         file_contents=f.read()
         ind = ['gdalt']
         meta = {

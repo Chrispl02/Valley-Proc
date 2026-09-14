@@ -70,9 +70,9 @@ def set_bki(year, month, day, hour, minute, second, heightList):
     bki = numpy.array(bki, order='F')
 
     #from schainpy.model.proc import mkfact_short_2020_2
-    import mkfact_short_2020_2
-    print("mkfact location", mkfact_short_2020_2)
-    mkfact_short_2020_2.mkfact(year, h, bfm, thb, bki, MAXNRANGENDT)
+    import mkfact_short_2020_2_valley
+    print("mkfact location", mkfact_short_2020_2_valley)
+    mkfact_short_2020_2_valley.mkfact(year, h, bfm, thb, bki, MAXNRANGENDT)
     return bki
     
 
@@ -120,6 +120,7 @@ def read_hf_file(path):
     print("metadata keys: ", metadata.keys())
     
     data_spc_group = hf['Data']['data_spc']
+    print("data_spc_group keys", data_spc_group.keys())
     
     channels_data = []
     for channel in data_spc_group.keys():

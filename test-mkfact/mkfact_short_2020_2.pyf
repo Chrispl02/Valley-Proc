@@ -1,0 +1,80 @@
+!    -*- f90 -*-
+! Note: the context of this file is case sensitive.
+
+python module mkfact_short_2020_2_valley ! in 
+    interface  ! in :mkfact_short_2020
+        subroutine mkfact(tm,h,bfm,thb,bki,nhts) ! in :mkfact_short_2020:mkfact_short1.f
+            real intent(in) :: tm
+	    integer intent(in) :: nhts
+            real dimension(nhts),intent(in):: h
+            real dimension(nhts),intent(inout),depend(nhts) :: bfm
+            real dimension(nhts),intent(inout),depend(nhts) :: thb
+            real dimension(nhts),intent(inout),depend(nhts) :: bki
+        end subroutine mkfact
+        subroutine geobfield(tm,r,theta,phi,br,bt,bp,b) ! in ::mkfact_short_2020:mkfact_short1.f
+            real :: tm
+            real :: r
+            real :: theta
+            real :: phi
+            real :: br
+            real :: bt
+            real :: bp
+            real :: b
+        end subroutine geobfield
+        subroutine convrt(i,gdlat,gdalt,gclat,rkm) ! in ::mkfact_short_2020:mkfact_short1.f
+            integer :: i
+            real :: gdlat
+            real :: gdalt
+            real :: gclat
+            real :: rkm
+        end subroutine convrt
+        subroutine getshc2(iu,fspec,nmax,erad,gh,ier) ! in ::mkfact_short_2020:mkfact_short1.f
+            integer :: iu
+            character*(*) :: fspec
+            integer :: nmax
+            real :: erad
+            real dimension(*) :: gh
+            integer :: ier
+        end subroutine getshc2
+        subroutine interpshc(date,dte1,nmax1,gh1,dte2,nmax2,gh2,nmax,gh) ! in ::mkfact_short_2020:mkfact_short1.f
+            real :: date
+            real :: dte1
+            integer :: nmax1
+            real dimension(*) :: gh1
+            real :: dte2
+            integer :: nmax2
+            real dimension(*) :: gh2
+            integer :: nmax
+            real dimension(*) :: gh
+        end subroutine interpshc
+        subroutine extrapshc(date,dte1,nmax1,gh1,nmax2,gh2,nmax,gh) ! in ::mkfact_short_2020:mkfact_short1.f
+            real :: date
+            real :: dte1
+            integer :: nmax1
+            real dimension(*) :: gh1
+            integer :: nmax2
+            real dimension(*) :: gh2
+            integer :: nmax
+            real dimension(*) :: gh
+        end subroutine extrapshc
+        subroutine shval3(igdgc,flat,flon,elev,erad,a2,b2,nmax,gh,iext,ext,x,y,z) ! in :mkfact_short:mkfact_short.f
+            integer :: igdgc
+            real :: flat
+            real :: flon
+            real :: elev
+            real :: erad
+            real :: a2
+            real :: b2
+            integer :: nmax
+            real dimension(224) :: gh
+            integer :: iext
+            real dimension(3) :: ext
+            real :: x
+            real :: y
+            real :: z
+        end subroutine shval3
+    end interface 
+end python module mkfact_short_2020_2_valley
+
+! This file was auto-generated with f2py (version:2).
+! See http://cens.ioc.ee/projects/f2py2e/
