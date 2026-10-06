@@ -9,16 +9,16 @@ controllerObj = Project()
 
 controllerObj.setup(id = '191', name='test01', description=desc)
 
-dpath = '/mnt/share/2026_08/Valley/main_radar/rawdata/'
-figpath = '/home/david/Documents/DATA-3/Valley/25_28_Aug_26/25_Aug_26'
+dpath = '/mnt/share/Valley/main_radar/rawdata'
+figpath = '/home/david/Documents/DATA-3/Valley/25_28_Aug_26/27_Aug_26'
 online=0
 delay=30
 walk=1
-startDate='2026/08/25'
-endDate='2026/08/25'
-startTime='00:00:00'
-endTime='23:59:59'
-t=['0','24']
+startDate='2026/08/27'
+endDate='2026/08/27'
+startTime='09:00:00'
+endTime='11:59:59'
+t=['9','12']
 
 readUnitConfObj = controllerObj.addReadUnit(datatype='VoltageReader',
                                             path=dpath,
@@ -61,7 +61,7 @@ opObj11 = procUnitConfObj1.addOperation(name='IncohInt', optype='other')
 opObj11.addParameter(name='timeInterval', value='60', format='float')
 #opObj11.addParameter(name='timeInterval', value='20', format='float')
 
-opObj11 = procUnitConfObj1.addOperation(name='SpectraPlot', optype='other')
+'''opObj11 = procUnitConfObj1.addOperation(name='SpectraPlot', optype='other')
 opObj11.addParameter(name='id', value='2001', format='int')
 opObj11.addParameter(name='wintitle', value='LONG SPC', format='str')
 opObj11.addParameter(name='xaxis', value='velocity', format='str')
@@ -71,20 +71,20 @@ opObj11.addParameter(name='showprofile', value='1')
 opObj11.addParameter(name='save', value=figpath, format='str')
 opObj11.addParameter(name='exp_code', value='233', format='int')
 opObj11.addParameter(name='server', value='10.10.120.138:4444', format='str')
-opObj11.addParameter(name='tag', value= 'jicamarca', format='str')
+opObj11.addParameter(name='tag', value= 'jicamarca', format='str')'''
 
 
-opObj11 = procUnitConfObj1.addOperation(name='CrossSpectraPlot', optype='other')
+'''opObj11 = procUnitConfObj1.addOperation(name='CrossSpectraPlot', optype='other')
 opObj11.addParameter(name='id', value='2005', format='int')
 opObj11.addParameter(name='wintitle', value='LONG CROSS-SPC', format='str')
 opObj11.addParameter(name='xaxis', value='velocity', format='str')
 opObj11.addParameter(name='coherence_cmap', value='jet', format='str')
 opObj11.addParameter(name='phase_cmap', value='jet', format='str')
-
 opObj11.addParameter(name='save', value=figpath, format='str')
 opObj11.addParameter(name='exp_code', value='233', format='int')
 opObj11.addParameter(name='server', value='10.10.120.138:4444', format='str')
-opObj11.addParameter(name='tag', value= 'jicamarca', format='str')
+opObj11.addParameter(name='tag', value= 'jicamarca', format='str')'''
+
 
 opObj11 = procUnitConfObj1.addOperation(name='CoherencePlot', optype='other')
 opObj11.addParameter(name='id', value='101', format='int')
@@ -99,6 +99,7 @@ opObj11.addParameter(name='save', value=figpath, format='str')
 opObj11.addParameter(name='exp_code', value='233', format='int')
 opObj11.addParameter(name='server', value='10.10.120.138:4444', format='str')
 opObj11.addParameter(name='tag', value= 'jicamarca', format='str')
+
 
 opObj11 = procUnitConfObj1.addOperation(name='PhasePlot', optype='other')
 opObj11.addParameter(name='id', value='102', format='int')
